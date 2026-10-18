@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fable 5.1</title>
+    <title>Claude Fable 5.1</title>
     <!-- Core Engine Import -->
     <script src="https://jsdelivr.net"></script>
     <link rel="stylesheet" href="style.css">
@@ -15,23 +15,27 @@
             <div class="brand">
                 <span class="sparkle">✦</span> Claude Fable 5.1
             </div>
-            <button id="toggle-config-btn" class="icon-btn">⚙️ System Config</button>
+            <button id="toggle-config-btn" class="icon-btn">⚙️ Custom AI Settings</button>
         </header>
 
-        <!-- Hidden/Toggleable System configuration panel -->
+        <!-- Slide Down System Settings Panel -->
         <section id="config-panel" class="config-panel hidden">
             <div class="panel-content">
-                <h3>1. Dataset Training Payload</h3>
-                <textarea id="training-data" placeholder="Paste sample code or text patterns...">
+                <h3>1. System Persona Prompt (Like Custom GPTs / Gems)</h3>
+                <textarea id="system-prompt" placeholder="Example: You are an expert Python engineer. Always format your responses cleanly and strictly output operational scripts. Keep explanations incredibly brief."></textarea>
+                
+                <h3>2. Context Training Dataset</h3>
+                <textarea id="training-data" placeholder="Paste sample data the model should learn patterns from...">
 function add(a, b) { return a + b; }
 function sub(a, b) { return a - b; }
 function mul(a, b) { return a * b; }
 function div(a, b) { return a / b; }
 const value = mul(10, 5);</textarea>
-                <button id="train-btn" class="action-btn">Compile & Train Model Brain</button>
+                
+                <button id="train-btn" class="action-btn">Compile Custom Agent Brain</button>
                 <div class="status-box" id="status-box">Status: Waiting to compile neural pathways...</div>
 
-                <h3>2. Restriction Guardrails</h3>
+                <h3>3. Restriction Guardrails</h3>
                 <div class="slider-container">
                     <div class="slider-header">
                         <span>Strictness Level:</span>
@@ -50,23 +54,21 @@ const value = mul(10, 5);</textarea>
         <main class="chat-container" id="chat-container">
             <div class="msg system">
                 <div class="msg-content">
-                    <p><strong>Fable 5.1 Core Online.</strong> Open <strong>System Config</strong> above to train my brain on custom code fragments, or adjust my strictness filters before running generation loops.</p>
+                    <p><strong>Custom Agent Pipeline Loaded.</strong> Open <strong>Custom AI Settings</strong> above to configure your system persona, paste data, and train your model.</p>
                 </div>
             </div>
         </main>
 
-        <!-- Bottom Input Bar (Looks like Claude) -->
+        <!-- Bottom Input Bar (Looks like Claude / ChatGPT) -->
         <footer class="input-container">
             <div class="input-wrapper">
-                <div class="seed-section">
-                    <label for="seed-input">Seed:</label>
-                    <input type="text" id="seed-input" value="f" maxlength="1">
-                </div>
-                <div class="divider"></div>
-                <div class="action-section">
-                    <button id="generate-btn" class="send-btn" disabled>Execute Inference</button>
-                </div>
+                <input type="text" id="seed-input" value="f" maxlength="1" class="hidden-seed">
+                <textarea id="chat-input" placeholder="Please train the model via the settings drawer first..." disabled></textarea>
+                <button id="generate-btn" class="send-btn" disabled>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
             </div>
+            <div class="disclaimer">Fable 5.1 runs client-side calculations entirely on your device browser.</div>
         </footer>
     </div>
     <script src="script.js"></script>
