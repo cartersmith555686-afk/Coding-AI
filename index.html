@@ -89,8 +89,6 @@
             font-size: 0.9rem;
         }
 
-        #system-prompt { height: 60px; color: #93c5fd; }
-        #training-data { height: 80px; color: #a7f3d0; font-family: monospace; }
 
         .action-btn {
             background: var(--accent);
@@ -166,25 +164,11 @@
     <div class="claude-app">
         <header class="app-header">
             <div class="brand"><span class="sparkle">✦</span> Coding AI</div>
-            <button id="toggle-config-btn" class="icon-btn">⚙️ Custom AI Settings</button>
+            <button id="toggle-config-btn" class="icon-btn">⚙️ Settings</button>
         </header>
 
         <section id="config-panel" class="config-panel hidden">
-            <h3>1. Persona Text</h3>
-            <textarea id="system-prompt" placeholder="Short text added to the start of the training data.">You are an elite programming assistant.</textarea>
-
-            <h3>2. Training Dataset</h3>
-            <textarea id="training-data" placeholder="Paste sample code here. The model imitates its patterns.">
-function add(a, b) { return a + b; }
-function sub(a, b) { return a - b; }
-function mul(a, b) { return a * b; }
-function div(a, b) { return a / b; }
-const value = mul(10, 5);</textarea>
-
-            <button id="train-btn" class="action-btn">Compile Model</button>
-            <div class="status-box" id="status-box">Status: Waiting to compile the model...</div>
-
-            <div class="slider-container" style="margin-top:10px;">
+            <div class="slider-container">
                 <div class="slider-header">
                     <span>Strictness Level:</span>
                     <span id="strictness-val" class="badge balanced">Balanced</span>
@@ -199,16 +183,16 @@ const value = mul(10, 5);</textarea>
 
         <main class="chat-container" id="chat-container">
             <div class="msg system">
-                <div class="msg-content">Open Custom AI Settings above, paste your dataset, and click Compile Model. Then type the start of some code and the model will continue it.</div>
+                <div class="msg-content">Type the start of some code (like "function" or "def") and I will continue it. Use Settings to change how strict I am.</div>
             </div>
         </main>
 
         <footer class="input-container">
             <div class="input-wrapper">
-                <textarea id="chat-input" placeholder="Please compile the model in settings first..." disabled></textarea>
-                <button id="generate-btn" class="send-btn" disabled>→</button>
+                <textarea id="chat-input" placeholder="Type the start of some code..."></textarea>
+                <button id="generate-btn" class="send-btn">→</button>
             </div>
-            <div class="disclaimer">Small pattern-based text model running on the server. It continues text in the style of your dataset; it is not a large language model.</div>
+            <div class="disclaimer">Small pattern-based model trained on a built-in code sample. It continues code in that style; it is not a large language model.</div>
         </footer>
     </div>
 
@@ -220,22 +204,9 @@ const value = mul(10, 5);</textarea>
         var chatContainer = document.getElementById('chat-container');
         var chatInput = document.getElementById('chat-input');
         var generateBtn = document.getElementById('generate-btn');
-        var trainBtn = document.getElementById('train-btn');
-        var statusBox = document.getElementById('status-box');
 
         var BACKEND_URL = window.location.origin;
         var busy = false;
-
-        // One id per browser so each visitor trains their own model.
-        function makeId() {
-            if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-            return 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-        }
-        var SESSION_ID;
-        try {
-            SESSION_ID = localStorage.getItem('coding-ai-session');
-            if (!SESSION_ID) { SESSION_ID = makeId(); localStorage.setItem('coding-ai-session', SESSION_ID); }
-        } catch (e) { SESSION_ID = makeId(); }
 
         toggleConfigBtn.addEventListener('click', function () {
             configPanel.classList.toggle('hidden');
@@ -285,7 +256,7 @@ const value = mul(10, 5);</textarea>
             var res = await fetch(BACKEND_URL + path, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(Object.assign({ session_id: SESSION_ID }, body))
+                body: JSON.stringify(body)
             });
             var data = null;
             try { data = await res.json(); } catch (e) { /* non-JSON error page */ }
@@ -294,36 +265,6 @@ const value = mul(10, 5);</textarea>
             }
             return data;
         }
-
-        function setStatus(text, isError) {
-            statusBox.textContent = text;
-            statusBox.className = 'status-box' + (isError ? ' error' : '');
-        }
-
-        trainBtn.addEventListener('click', async function () {
-            if (busy) return;
-            busy = true;
-            trainBtn.disabled = true;
-            setStatus('Compiling model...');
-            try {
-                var data = await postJSON('/train', {
-                    system_prompt: document.getElementById('system-prompt').value,
-                    dataset_text: document.getElementById('training-data').value
-                });
-                setStatus(data.message);
-                chatInput.disabled = false;
-                generateBtn.disabled = false;
-                chatInput.placeholder = 'Type the start of some code...';
-                configPanel.classList.add('hidden');
-                appendMessage('Model compiled. Type the start of some code and I will continue it.', 'system');
-            } catch (err) {
-                setStatus('Training failed: ' + err.message, true);
-                console.error(err);
-            } finally {
-                busy = false;
-                trainBtn.disabled = false;
-            }
-        });
 
         async function sendMessage() {
             var prompt = chatInput.value.trim();

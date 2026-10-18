@@ -1,59 +1,30 @@
-"""Coding AI: a small pattern-based text generator with a strictness slider.
+"""Coding AI: a small pattern-based code generator with a strictness slider.
 
-The model is a character-level n-gram (Markov) model with backoff. It can only
-recombine patterns found in the training text; it is not a large language model.
-Each browser session gets its own model, so visitors never overwrite each other.
+The model is a character-level n-gram (Markov) model with backoff, trained once
+at startup on the bundled corpus.txt. It can only recombine patterns found in
+that file; it is not a large language model.
 """
 import os
-import re
 import random
-import threading
-from collections import Counter, OrderedDict, defaultdict
+from collections import Counter, defaultdict
 
 from flask import Flask, jsonify, request, send_from_directory
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CORPUS_PATH = os.path.join(BASE_DIR, "corpus.txt")
 
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 512 * 1024  # reject oversized request bodies
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024  # reject oversized request bodies
 
-ORDER = 4                      # longest context (in characters) the model looks at
-MAX_DATASET_CHARS = 200_000    # keeps training and memory bounded
+ORDER = 4                  # longest context (in characters) the model looks at
 MAX_PROMPT_CHARS = 2_000
-MAX_SESSIONS = 50              # oldest sessions are evicted beyond this
 DEFAULT_OUTPUT_CHARS = 180
 MAX_OUTPUT_CHARS = 600
 
-DEFAULT_PROMPT = "You are an elite programming assistant."
-DEFAULT_DATA = "function add(a, b) { return a + b; }\nfunction sub(a, b) { return a - b; }"
-
-SESSION_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
-
-_models = OrderedDict()  # session_id -> model dict
-_lock = threading.Lock()
-
 
 # --------------------------------------------------------------------------
-# Helpers
+# Model
 # --------------------------------------------------------------------------
-def error(message, status=400):
-    return jsonify({"status": "error", "message": message}), status
-
-
-def to_int(value, default, lo, hi):
-    """Parse anything into an int clamped to [lo, hi]; fall back to default."""
-    try:
-        number = int(float(value))
-    except (TypeError, ValueError, OverflowError):
-        return default
-    return max(lo, min(hi, number))
-
-
-def get_session_id(data):
-    sid = data.get("session_id") or request.headers.get("X-Session-Id")
-    return sid if isinstance(sid, str) and SESSION_RE.match(sid) else None
-
-
 def build_model(text):
     """Count which character follows each context of length 1..ORDER."""
     tables = {k: defaultdict(Counter) for k in range(1, ORDER + 1)}
@@ -61,7 +32,15 @@ def build_model(text):
         table = tables[k]
         for i in range(len(text) - k):
             table[text[i:i + k]][text[i + k]] += 1
-    return {"tables": tables, "text": text, "vocab": len(set(text))}
+    return {"tables": tables, "text": text}
+
+
+def load_corpus():
+    with open(CORPUS_PATH, "r", encoding="utf-8") as f:
+        return f.read().strip()
+
+
+MODEL = build_model(load_corpus())
 
 
 def lookup(model, buf):
@@ -84,7 +63,7 @@ def strictness_settings(strictness):
 
     Low  = high temperature, any pattern allowed (creative, can ramble).
     High = low temperature, only the few most likely characters, and it stops
-           instead of guessing when the output no longer matches training data.
+           instead of guessing when the output no longer matches the corpus.
     """
     temperature = 1.6 - 1.4 * (strictness / 100)  # 1.6 -> 0.2
     strict = strictness > 70
@@ -103,17 +82,17 @@ def generate_text(model, prompt, strictness, limit):
 
     if lookup(model, buf)[1] is None:
         if cfg["strict"]:
-            return "", "Prompt not found in training data (strict mode refuses to guess)."
+            return "", "Prompt not found in the built-in code sample (strict mode refuses to guess)."
         buf = random_start(model)
 
     out = []
     for _ in range(limit):
         order, counter = lookup(model, buf)
         if counter is None:
-            halted = "Reached a pattern with no continuation in the training data."
+            halted = "Reached a pattern with no continuation in the code sample."
             break
         if len(buf) >= 2 and order < cfg["min_order"]:
-            halted = "Stopped: output drifted away from patterns in the training data."
+            halted = "Stopped: output drifted away from patterns in the code sample."
             break
 
         items = counter.most_common(cfg["top_k"]) if cfg["top_k"] else list(counter.items())
@@ -124,6 +103,19 @@ def generate_text(model, prompt, strictness, limit):
         buf = (buf + ch)[-ORDER:]
 
     return "".join(out), halted
+
+
+def to_int(value, default, lo, hi):
+    """Parse anything into an int clamped to [lo, hi]; fall back to default."""
+    try:
+        number = int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return max(lo, min(hi, number))
+
+
+def error(message, status=400):
+    return jsonify({"status": "error", "message": message}), status
 
 
 # --------------------------------------------------------------------------
@@ -144,61 +136,17 @@ def too_large(_e):
     return error("Request too large.", 413)
 
 
-@app.route("/train", methods=["POST"])
-def train():
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return error("Send a JSON body.")
-
-    sid = get_session_id(data)
-    if not sid:
-        return error("Missing or invalid session_id.")
-
-    system_prompt = str(data.get("system_prompt") or "").strip() or DEFAULT_PROMPT
-    dataset_text = str(data.get("dataset_text") or "").strip() or DEFAULT_DATA
-
-    if len(dataset_text) < 5:
-        return error("Dataset too short! Paste at least a few lines.")
-
-    training_context = f"{system_prompt}\n{dataset_text}"
-    if len(training_context) > MAX_DATASET_CHARS:
-        return error(f"Dataset too large (max {MAX_DATASET_CHARS:,} characters).", 413)
-
-    model = build_model(training_context)
-    with _lock:
-        _models[sid] = model
-        _models.move_to_end(sid)
-        while len(_models) > MAX_SESSIONS:
-            _models.popitem(last=False)
-
-    return jsonify({
-        "status": "success",
-        "message": f"Compiled model with {model['vocab']} unique characters from {len(training_context):,} characters of text.",
-    })
-
-
 @app.route("/generate", methods=["POST"])
 def generate():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error("Send a JSON body.")
 
-    sid = get_session_id(data)
-    if not sid:
-        return error("Missing or invalid session_id.")
-
-    with _lock:
-        model = _models.get(sid)
-        if model:
-            _models.move_to_end(sid)
-    if not model:
-        return error("Model not trained yet! Open settings and compile it first.")
-
     prompt = str(data.get("prompt") or "")[:MAX_PROMPT_CHARS].strip()
     strictness = to_int(data.get("strictness"), 50, 0, 100)
     limit = to_int(data.get("max_chars"), DEFAULT_OUTPUT_CHARS, 1, MAX_OUTPUT_CHARS)
 
-    output, halted = generate_text(model, prompt, strictness, limit)
+    output, halted = generate_text(MODEL, prompt, strictness, limit)
     return jsonify({"status": "success", "output": output, "halted": halted})
 
 

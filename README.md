@@ -1,22 +1,22 @@
 # Coding AI
 
-A small Flask app with a chat UI that trains a **character-level n-gram (Markov) model** on text you paste in, then continues whatever you type in the style of that text. A **strictness slider** controls how adventurous or conservative the output is.
+A small Flask app with a chat UI. Type the start of some code and a **character-level n-gram (Markov) model** continues it. A **strictness slider** controls how adventurous or conservative the output is.
 
-It is not a large language model: it can only recombine patterns from your dataset, and it cannot follow instructions. For a real coding assistant, call an LLM API instead.
+There is nothing to train or upload: the model is built at startup from the bundled `corpus.txt` (a small sample of JavaScript, Python, HTML, CSS and SQL). To change what it can write, edit that file and redeploy.
+
+It is not a large language model: it can only recombine patterns from `corpus.txt`, and it cannot follow instructions or write genuinely new code. For a real coding assistant, call an LLM API instead.
 
 ## How it works
 
-- **Training** (`POST /train`): builds counts of which character follows every 1 to 4 character context. Capped at 200,000 characters.
-- **Generation** (`POST /generate`): your prompt seeds the model, which then predicts one character at a time, backing off to shorter contexts when needed.
-- **Sessions**: each browser gets its own model (a random session id kept in `localStorage`), so visitors don't overwrite each other. The server keeps the 50 most recent sessions in memory.
+`POST /generate` takes `{"prompt": "...", "strictness": 0-100}`. Your prompt seeds the model, which predicts one character at a time from the last 1 to 4 characters, backing off to shorter contexts when needed.
 
 ### Strictness slider
 
 | Slider | Label | Behavior |
 |---|---|---|
 | 0 to 34 | Unrestricted | High temperature (up to 1.6). Varied, sometimes rambling output. |
-| 35 to 70 | Balanced | Medium temperature. Falls back to a random start if your prompt isn't in the data. |
-| 71 to 100 | Max Strict | Low temperature (down to 0.2), only the 3 most likely next characters, and it stops with a note instead of guessing when the output drifts from the training data or the prompt isn't found. |
+| 35 to 70 | Balanced | Medium temperature. Uses a random start if your prompt isn't in the sample. |
+| 71 to 100 | Max Strict | Low temperature (down to 0.2), only the 3 most likely next characters, and it stops with a note instead of guessing when output drifts from the sample or the prompt isn't found. |
 
 ## Run locally
 
@@ -28,4 +28,4 @@ python -m unittest -v  # run the tests
 
 ## Deploy on Render
 
-`render.yaml` is included. In Render choose **New > Blueprint**, pick this repo, and deploy. The start command uses `--workers 1` on purpose, because trained models live in memory. Free-tier services sleep when idle and lose trained models on restart, so recompile after a cold start.
+`render.yaml` is included. In Render choose **New > Blueprint**, pick this repo, and deploy. Free-tier services sleep when idle, so the first visit after a while takes about 30 seconds.
