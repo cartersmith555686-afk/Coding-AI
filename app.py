@@ -1,8 +1,7 @@
 import os
 import random
 import math
-# Added render_template to imports
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
@@ -18,8 +17,18 @@ DEFAULT_DATA = "function add(a, b) { return a + b; }\nfunction sub(a, b) { retur
 
 @app.route('/')
 def home():
-    # FIXED: Uses native Flask templates to read index.html from the templates/ folder automatically
-    return render_template('index.html')
+    # BYPASSES TEMPLATE FOLDER: Reads index.html directly from your main root folder
+    try:
+        # First check the main directory
+        with open('index.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        # Fallback if it's still stuck inside a templates folder somewhere
+        try:
+            with open(os.path.join('templates', 'index.html'), 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError:
+            return "Custom AI Front-end Error: Ensure index.html is uploaded in your main GitHub repository directory.", 404
 
 @app.route('/train', methods=['POST'])
 def train():
@@ -29,13 +38,11 @@ def train():
     system_prompt = data.get('system_prompt', '').strip() or DEFAULT_PROMPT
     dataset_text = data.get('dataset_text', '').strip() or DEFAULT_DATA
     
-    # Merge custom persona prompt rules into the training data stream
     training_context = f"{system_prompt}\n{dataset_text}"
     
     if len(training_context) < 5:
         return jsonify({"status": "error", "message": "Dataset too short!"}), 400
         
-    # Build vocabulary mappings
     model_vocab = list(set(training_context))
     char_to_idx = {char: i for i, char in enumerate(model_vocab)}
     idx_to_char = {i: char for i, char in enumerate(model_vocab)}
@@ -52,35 +59,28 @@ def generate():
     user_prompt = data.get('prompt', '').strip()
     strictness = int(data.get('strictness', 50))
     
-    # Map strictness slider values into temperature parameters
     if strictness < 35:
-        temperature = 1.5  # Less strict/wild
+        temperature = 1.5  
         min_confidence = 0.0
     elif strictness <= 70:
-        temperature = 0.7  # Balanced
+        temperature = 0.7  
         min_confidence = 0.1
     else:
-        temperature = 0.2  # Max strict/rigid
+        temperature = 0.2  
         min_confidence = 0.4
 
-    # Extract initial seed token from the custom chat message
     seed_char = user_prompt if user_prompt and user_prompt in char_to_idx else random.choice(model_vocab)
     generated_text = seed_char
     current_char = seed_char
 
-    # Simulated server-side inference loop based on relative text frequencies
     for _ in range(180):
-        # Look for instances of current token inside the training context matrix
         positions = [i for i, char in enumerate(training_context[:-1]) if char == current_char]
-        
         if not positions:
             break
             
-        # Compile counts for what character usually follows next
         next_chars = [training_context[pos + 1] for pos in positions]
         weights = {c: next_chars.count(c) / len(next_chars) for c in set(next_chars)}
         
-        # Apply Temperature scale to adjust strictness
         adjusted_weights = {}
         for c, w in weights.items():
             try:
@@ -92,11 +92,9 @@ def generate():
         if total_w == 0:
             break
             
-        # Select next character
         choices = list(adjusted_weights.keys())
         probabilities = [adjusted_weights[c] / total_w for c in choices]
         
-        # Strictness check: Enforce confidence cutoff
         if max(probabilities) < min_confidence:
             generated_text += "\n\n[Halted: Confidence falls below guardrails threshold]"
             break
