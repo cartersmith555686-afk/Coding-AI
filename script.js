@@ -58,7 +58,6 @@ async function trainModel() {
     const systemPromptText = document.getElementById('system-prompt').value.trim();
     const coreDatasetText = document.getElementById('training-data').value;
     
-    // Inject the System Prompt instructions directly into the baseline vocabulary learning stream
     const combinedTrainingText = systemPromptText + "\n" + coreDatasetText;
     
     if (combinedTrainingText.length <= seqLength) {
@@ -124,10 +123,9 @@ function generateText() {
     appendMessage(textPrompt, "user");
     chatInput.value = "";
 
-    // Pull starting matching target character coordinate index seed out of user input string
+    // Hidden seed extraction mechanics
     let seed = textPrompt.charAt(0);
     if (!charToIdx.hasOwnProperty(seed)) {
-        // Fallback if prompt character doesn't map directly
         seed = chars[Math.floor(Math.random() * chars.length)];
     }
 
