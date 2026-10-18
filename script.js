@@ -4,24 +4,24 @@ let charToIdx = {};
 let idxToChar = {};
 const seqLength = 5; 
 
-// UI Toggles & Control Elements
+// Form Query Interceptors
 const toggleConfigBtn = document.getElementById('toggle-config-btn');
 const configPanel = document.getElementById('config-panel');
 const strictnessSlider = document.getElementById('strictness-slider');
 const strictnessVal = document.getElementById('strictness-val');
 const chatContainer = document.getElementById('chat-container');
+const chatInput = document.getElementById('chat-input');
+const generateBtn = document.getElementById('generate-btn');
 
 let currentTemp = 0.7;
 let minConfidence = 0.3;
 
-// Toggle Config Panel visibility
 toggleConfigBtn.addEventListener('click', () => {
     configPanel.classList.toggle('hidden');
 });
 
 function updateInternalParameters() {
     const sliderVal = parseInt(strictnessSlider.value);
-
     if (sliderVal < 35) {
         strictnessVal.textContent = "Unrestricted";
         strictnessVal.className = "badge unrestricted";
@@ -43,7 +43,6 @@ function updateInternalParameters() {
 strictnessSlider.addEventListener('input', updateInternalParameters);
 updateInternalParameters();
 
-// Helper to push stylized message blocks into standard UI stream
 function appendMessage(text, side) {
     const msgDiv = document.createElement('div');
     msgDiv.classList.add('msg', side);
@@ -52,21 +51,25 @@ function appendMessage(text, side) {
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-// Training Implementation
+// Deep Learning Model Compiler
 async function trainModel() {
     const statusBox = document.getElementById('status-box');
     const trainBtn = document.getElementById('train-btn');
-    const text = document.getElementById('training-data').value;
+    const systemPromptText = document.getElementById('system-prompt').value.trim();
+    const coreDatasetText = document.getElementById('training-data').value;
     
-    if (text.length <= seqLength) {
-        statusBox.textContent = "Error: Input dataset is too brief.";
+    // Inject the System Prompt instructions directly into the baseline vocabulary learning stream
+    const combinedTrainingText = systemPromptText + "\n" + coreDatasetText;
+    
+    if (combinedTrainingText.length <= seqLength) {
+        statusBox.textContent = "Error: Settings payload requires more string content data.";
         return;
     }
 
     trainBtn.disabled = true;
-    statusBox.textContent = "Processing tensor mapping configurations...";
+    statusBox.textContent = "Injecting custom instructions matrix...";
 
-    chars = Array.from(new Set(text));
+    chars = Array.from(new Set(combinedTrainingText));
     charToIdx = {};
     idxToChar = {};
     chars.forEach((char, i) => {
@@ -77,9 +80,9 @@ async function trainModel() {
     const vocabSize = chars.length;
     const inputs = [];
     const labels = [];
-    for (let i = 0; i < text.length - seqLength; i++) {
-        inputs.push(text.substring(i, i + seqLength).split('').map(c => charToIdx[c]));
-        labels.push(charToIdx[text.charAt(i + seqLength)]);
+    for (let i = 0; i < combinedTrainingText.length - seqLength; i++) {
+        inputs.push(combinedTrainingText.substring(i, i + seqLength).split('').map(c => charToIdx[c]));
+        labels.push(charToIdx[combinedTrainingText.charAt(i + seqLength)]);
     }
 
     const xs = tf.oneHot(tf.tensor2d(inputs, [inputs.length, seqLength], 'int32'), vocabSize);
@@ -90,49 +93,48 @@ async function trainModel() {
     model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
     model.add(tf.layers.dense({ units: vocabSize, activation: 'softmax' }));
 
-    model.compile({
-        optimizer: tf.train.adam(0.01),
-        loss: 'categoricalCrossentropy'
-    });
+    model.compile({ optimizer: tf.train.adam(0.01), loss: 'categoricalCrossentropy' });
 
     await model.fit(xs, ys, {
         epochs: 45,
         batchSize: 32,
         callbacks: {
             onEpochEnd: (epoch, logs) => {
-                statusBox.textContent = `Optimizing Weights: Epoch ${epoch + 1}/45 | Current System Loss: ${logs.loss.toFixed(4)}`;
+                statusBox.textContent = `Aligning Persona... Progress: ${Math.round(((epoch+1)/45)*100)}%`;
             }
         }
     });
 
-    statusBox.textContent = "Online: Brain configured successfully.";
-    document.getElementById('generate-btn').disabled = false;
-    trainBtn.disabled = false;
-    
-    // Automatically collapse setup dashboard on completion to show clean chat panel
+    statusBox.textContent = "Custom AI Persona loaded successfully.";
+    chatInput.disabled = false;
+    generateBtn.disabled = false;
+    chatInput.placeholder = "Message Claude Fable 5.1...";
     configPanel.classList.add('hidden');
-    appendMessage("<em>System Configuration Updated. AI Core is live and loaded with new data structures.</em>", "system");
+    appendMessage("<em>Your customized system instructions have been compiled into the core model weights successfully.</em>", "system");
 
     xs.dispose();
     ys.dispose();
 }
 
-// Inference generation matching Claude bubble logs
+// Local Execution Loop
 function generateText() {
-    const seed = document.getElementById('seed-input').value;
-    
-    if (!seed || !charToIdx.hasOwnProperty(seed)) {
-        appendMessage(`System Error: Prompt seed token '${seed}' doesn't match compiled network index parameters.`, "system");
-        return;
+    const textPrompt = chatInput.value.trim();
+    if (!textPrompt) return;
+
+    appendMessage(textPrompt, "user");
+    chatInput.value = "";
+
+    // Pull starting matching target character coordinate index seed out of user input string
+    let seed = textPrompt.charAt(0);
+    if (!charToIdx.hasOwnProperty(seed)) {
+        // Fallback if prompt character doesn't map directly
+        seed = chars[Math.floor(Math.random() * chars.length)];
     }
 
-    // Print out standard chat dialogue block
-    appendMessage(`Execute local iteration prompt from seed token: "${seed}"`, "user");
-
     let currentSeq = seed.repeat(seqLength).substring(0, seqLength);
-    let generatedText = seed;
+    let generatedText = "";
     
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; i < 180; i++) {
         let halted = false;
 
         tf.tidy(() => {
@@ -142,7 +144,7 @@ function generateText() {
             
             const highestProb = rawPrediction.max().dataSync();
             if (highestProb < minConfidence) {
-                generatedText += `\n\n[HALTED: Node confidence metric ${highestProb.toFixed(2)} drops below safety barrier limit (${minConfidence.toFixed(2)})]`;
+                generatedText += `\n\n[Halted: Confidence falls below guardrails threshold]`;
                 halted = true;
                 return;
             }
@@ -164,4 +166,10 @@ function generateText() {
 }
 
 document.getElementById('train-btn').addEventListener('click', trainModel);
-document.getElementById('generate-btn').addEventListener('click', generateText);
+generateBtn.addEventListener('click', generateText);
+chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        generateText();
+    }
+});
