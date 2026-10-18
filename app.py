@@ -1,7 +1,8 @@
 import os
 import random
 import math
-from flask import Flask, request, jsonify, render_template_string
+# Added render_template to imports
+from flask import Flask, request, jsonify, render_template
 
 app = Flask(__name__)
 
@@ -17,9 +18,8 @@ DEFAULT_DATA = "function add(a, b) { return a + b; }\nfunction sub(a, b) { retur
 
 @app.route('/')
 def home():
-    # Serves the clean Claude interface directly from the server
-    with open('index.html', 'r', encoding='utf-8') as f:
-        return render_template_string(f.read())
+    # FIXED: Uses native Flask templates to read index.html from the templates/ folder automatically
+    return render_template('index.html')
 
 @app.route('/train', methods=['POST'])
 def train():
@@ -64,7 +64,7 @@ def generate():
         min_confidence = 0.4
 
     # Extract initial seed token from the custom chat message
-    seed_char = user_prompt[0] if user_prompt and user_prompt[0] in char_to_idx else random.choice(model_vocab)
+    seed_char = user_prompt if user_prompt and user_prompt in char_to_idx else random.choice(model_vocab)
     generated_text = seed_char
     current_char = seed_char
 
