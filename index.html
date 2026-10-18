@@ -3,66 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fable 5.1 // Neural Engine Sandbox</title>
+    <title>Fable 5.1</title>
     <!-- Core Engine Import -->
     <script src="https://jsdelivr.net"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="cyber-container">
-        <!-- Control Deck Panel -->
-        <aside class="control-panel">
+    <div class="claude-app">
+        <!-- Top Navigation Bar -->
+        <header class="app-header">
             <div class="brand">
-                <h2>FABLE_5.1</h2>
-                <span class="pulse-indicator"></span> NATIVE_LLM_CORE
+                <span class="sparkle">✦</span> Claude Fable 5.1
             </div>
+            <button id="toggle-config-btn" class="icon-btn">⚙️ System Config</button>
+        </header>
 
-            <div class="section-title">1. Dataset Payload</div>
-            <textarea id="training-data" placeholder="Inject raw text or code structures for training...">
+        <!-- Hidden/Toggleable System configuration panel -->
+        <section id="config-panel" class="config-panel hidden">
+            <div class="panel-content">
+                <h3>1. Dataset Training Payload</h3>
+                <textarea id="training-data" placeholder="Paste sample code or text patterns...">
 function add(a, b) { return a + b; }
 function sub(a, b) { return a - b; }
 function mul(a, b) { return a * b; }
 function div(a, b) { return a / b; }
 const value = mul(10, 5);</textarea>
+                <button id="train-btn" class="action-btn">Compile & Train Model Brain</button>
+                <div class="status-box" id="status-box">Status: Waiting to compile neural pathways...</div>
 
-            <button id="train-btn" class="glow-btn-primary">Compile & Train Core</button>
-            <div class="telemetry-box" id="status-box">SYSTEM_STATUS: Awaiting architectural setup...</div>
-
-            <div class="section-title">2. Policy Framework</div>
-            <div class="control-group">
-                <div class="slider-header">
-                    <label for="strictness-slider">AI Guardrails Status</label>
-                    <span id="strictness-val" class="status-badge standard">Balanced</span>
+                <h3>2. Restriction Guardrails</h3>
+                <div class="slider-container">
+                    <div class="slider-header">
+                        <span>Strictness Level:</span>
+                        <span id="strictness-val" class="badge balanced">Balanced</span>
+                    </div>
+                    <input type="range" id="strictness-slider" min="0" max="100" value="50">
+                    <div class="slider-labels">
+                        <span>Less Strict</span>
+                        <span>More Strict</span>
+                    </div>
                 </div>
-                <input type="range" id="strictness-slider" min="0" max="100" value="50">
-                <div class="slider-labels">
-                    <span>Less Strict</span>
-                    <span>More Strict</span>
-                </div>
-                <small class="help-text">Adjusting this updates underlying mathematical temperature and cutoff parameters simultaneously.</small>
             </div>
-        </aside>
+        </section>
 
-        <!-- Generation Dashboard Panel -->
-        <main class="workspace">
-            <div class="terminal-header">
-                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-                <span class="terminal-title">fable_core_inference_node</span>
-            </div>
-            
-            <div class="inference-inputs">
-                <div class="input-block">
-                    <label for="seed-input">Model Seed Token:</label>
-                    <input type="text" id="seed-input" value="f" maxlength="1">
+        <!-- Main Chat Message Window -->
+        <main class="chat-container" id="chat-container">
+            <div class="msg system">
+                <div class="msg-content">
+                    <p><strong>Fable 5.1 Core Online.</strong> Open <strong>System Config</strong> above to train my brain on custom code fragments, or adjust my strictness filters before running generation loops.</p>
                 </div>
-                <button id="generate-btn" class="glow-btn-secondary" disabled>Execute Inference</button>
-            </div>
-
-            <div class="output-container">
-                <div class="output-header">GENERATED_NEURAL_STREAM</div>
-                <div class="output-pane" id="output-box">// Compiled weights output stream will execute here...</div>
             </div>
         </main>
+
+        <!-- Bottom Input Bar (Looks like Claude) -->
+        <footer class="input-container">
+            <div class="input-wrapper">
+                <div class="seed-section">
+                    <label for="seed-input">Seed:</label>
+                    <input type="text" id="seed-input" value="f" maxlength="1">
+                </div>
+                <div class="divider"></div>
+                <div class="action-section">
+                    <button id="generate-btn" class="send-btn" disabled>Execute Inference</button>
+                </div>
+            </div>
+        </footer>
     </div>
     <script src="script.js"></script>
 </body>
