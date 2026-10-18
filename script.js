@@ -4,57 +4,67 @@ let charToIdx = {};
 let idxToChar = {};
 const seqLength = 5; 
 
-// Dynamic Mapping Elements
+// UI Toggles & Control Elements
+const toggleConfigBtn = document.getElementById('toggle-config-btn');
+const configPanel = document.getElementById('config-panel');
 const strictnessSlider = document.getElementById('strictness-slider');
 const strictnessVal = document.getElementById('strictness-val');
+const chatContainer = document.getElementById('chat-container');
 
-// Global backend variables managed by your singular frontend slider
 let currentTemp = 0.7;
 let minConfidence = 0.3;
+
+// Toggle Config Panel visibility
+toggleConfigBtn.addEventListener('click', () => {
+    configPanel.classList.toggle('hidden');
+});
 
 function updateInternalParameters() {
     const sliderVal = parseInt(strictnessSlider.value);
 
     if (sliderVal < 35) {
-        // Less Strict / Unrestricted Configuration Matrix
         strictnessVal.textContent = "Unrestricted";
-        strictnessVal.className = "status-badge unrestricted";
-        // Interpolate parameters to scale to 1.8 creativity and remove confidence cutoffs entirely
+        strictnessVal.className = "badge unrestricted";
         currentTemp = 0.8 + ((35 - sliderVal) / 35) * 1.0; 
         minConfidence = 0.0; 
     } else if (sliderVal >= 35 && sliderVal <= 70) {
-        // Balanced Normal Behavior Block
         strictnessVal.textContent = "Balanced";
-        strictnessVal.className = "status-badge standard";
+        strictnessVal.className = "badge balanced";
         currentTemp = 0.5 + ((70 - sliderVal) / 35) * 0.3;
         minConfidence = 0.1 + ((sliderVal - 35) / 35) * 0.3;
     } else {
-        // More Strict / Rigid Precision Matrix
         strictnessVal.textContent = "Max Strict";
-        strictnessVal.className = "status-badge strict";
-        // Force the model to pick only highly probable tokens or quit immediately
+        strictnessVal.className = "badge strict";
         currentTemp = 0.4 - ((sliderVal - 70) / 30) * 0.3; 
         minConfidence = 0.4 + ((sliderVal - 70) / 30) * 0.45;
     }
 }
 
-// Attach listener hooks
 strictnessSlider.addEventListener('input', updateInternalParameters);
-updateInternalParameters(); // Initialize states on startup
+updateInternalParameters();
 
-// Core Compiler/Trainer Pipeline
+// Helper to push stylized message blocks into standard UI stream
+function appendMessage(text, side) {
+    const msgDiv = document.createElement('div');
+    msgDiv.classList.add('msg', side);
+    msgDiv.innerHTML = `<div class="msg-content">${text}</div>`;
+    chatContainer.appendChild(msgDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+// Training Implementation
 async function trainModel() {
     const statusBox = document.getElementById('status-box');
     const trainBtn = document.getElementById('train-btn');
     const text = document.getElementById('training-data').value;
     
     if (text.length <= seqLength) {
-        statusBox.textContent = "CRITICAL_ERROR: Dataset string configuration too low.";
+        statusBox.textContent = "Error: Input dataset is too brief.";
         return;
     }
 
     trainBtn.disabled = true;
-    statusBox.textContent = "INITIALIZING: Creating vector vocabulary arrays...";
+    statusBox.textContent = "Processing tensor mapping configurations...";
 
     chars = Array.from(new Set(text));
     charToIdx = {};
@@ -75,8 +85,6 @@ async function trainModel() {
     const xs = tf.oneHot(tf.tensor2d(inputs, [inputs.length, seqLength], 'int32'), vocabSize);
     const ys = tf.oneHot(tf.tensor1d(labels, 'int32'), vocabSize);
 
-    statusBox.textContent = "COMPILING: Mounting Core Layer Matrices...";
-
     model = tf.sequential();
     model.add(tf.layers.flatten({ inputShape: [seqLength, vocabSize] }));
     model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
@@ -87,39 +95,42 @@ async function trainModel() {
         loss: 'categoricalCrossentropy'
     });
 
-    statusBox.textContent = "COMPUTE_ACTIVE: Fitting weights on execution matrix...";
-
     await model.fit(xs, ys, {
-        epochs: 50,
+        epochs: 45,
         batchSize: 32,
         callbacks: {
             onEpochEnd: (epoch, logs) => {
-                statusBox.textContent = `RUNNING: Epoch ${epoch + 1}/50\nLOSS_METRIC: ${logs.loss.toFixed(4)}`;
+                statusBox.textContent = `Optimizing Weights: Epoch ${epoch + 1}/45 | Current System Loss: ${logs.loss.toFixed(4)}`;
             }
         }
     });
 
-    statusBox.textContent = "ONLINE: Neural system compilation stable. Inferencing unlocked.";
+    statusBox.textContent = "Online: Brain configured successfully.";
     document.getElementById('generate-btn').disabled = false;
     trainBtn.disabled = false;
     
+    // Automatically collapse setup dashboard on completion to show clean chat panel
+    configPanel.classList.add('hidden');
+    appendMessage("<em>System Configuration Updated. AI Core is live and loaded with new data structures.</em>", "system");
+
     xs.dispose();
     ys.dispose();
 }
 
-// Inference Engine Routine
+// Inference generation matching Claude bubble logs
 function generateText() {
-    const outputBox = document.getElementById('output-box');
     const seed = document.getElementById('seed-input').value;
     
     if (!seed || !charToIdx.hasOwnProperty(seed)) {
-        outputBox.textContent = `// RUNTIME_ERROR: Seed character '${seed}' missing from compiled training vocab registry.`;
+        appendMessage(`System Error: Prompt seed token '${seed}' doesn't match compiled network index parameters.`, "system");
         return;
     }
 
+    // Print out standard chat dialogue block
+    appendMessage(`Execute local iteration prompt from seed token: "${seed}"`, "user");
+
     let currentSeq = seed.repeat(seqLength).substring(0, seqLength);
     let generatedText = seed;
-    outputBox.textContent = ""; 
     
     for (let i = 0; i < 150; i++) {
         let halted = false;
@@ -129,19 +140,17 @@ function generateText() {
             const inputTensor = tf.oneHot(tf.tensor2d([inputIndices], [1, seqLength], 'int32'), chars.length);
             const rawPrediction = model.predict(inputTensor);
             
-            // Validate absolute highest structural verification confidence
-            const highestProb = rawPrediction.max().dataSync()[0];
+            const highestProb = rawPrediction.max().dataSync();
             if (highestProb < minConfidence) {
-                generatedText += `\n\n[EXECUTION_HALTED: Prediction confidence metric ${highestProb.toFixed(2)} drops below strict safety parameter threshold limit (${minConfidence.toFixed(2)})]`;
+                generatedText += `\n\n[HALTED: Node confidence metric ${highestProb.toFixed(2)} drops below safety barrier limit (${minConfidence.toFixed(2)})]`;
                 halted = true;
                 return;
             }
 
-            // Apply Temperature Scaling
             const logPrediction = tf.div(tf.log(tf.add(rawPrediction, 1e-7)), currentTemp);
             const finalProbabilities = tf.softmax(logPrediction);
             
-            const predictedIdx = tf.multinomial(finalProbabilities, 1).dataSync()[0];
+            const predictedIdx = tf.multinomial(finalProbabilities, 1).dataSync();
             const nextChar = idxToChar[predictedIdx];
             
             generatedText += nextChar;
@@ -151,7 +160,7 @@ function generateText() {
         if (halted) break;
     }
     
-    outputBox.textContent = generatedText;
+    appendMessage(generatedText, "ai");
 }
 
 document.getElementById('train-btn').addEventListener('click', trainModel);
