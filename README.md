@@ -1,31 +1,43 @@
 # Coding AI
 
-A small Flask app with a chat UI. Type the start of some code and a **character-level n-gram (Markov) model** continues it. A **strictness slider** controls how adventurous or conservative the output is.
+A streaming chat app where you describe the code you want and an AI writes it, like ChatGPT, Gemini or Claude but focused on coding. It runs a small Flask server that forwards your conversation to an LLM API (Anthropic Claude or Google Gemini) with a coding-assistant prompt.
 
-There is nothing to train or upload: the model is built at startup from the bundled `corpus.txt` (a small sample of JavaScript, Python, HTML, CSS and SQL). To change what it can write, edit that file and redeploy.
+Features: streaming answers, code blocks with a Copy button, follow-up questions and code edits (the conversation is remembered in your browser), a Stop button, and a password gate so strangers can't spend your API credits.
 
-It is not a large language model: it can only recombine patterns from `corpus.txt`, and it cannot follow instructions or write genuinely new code. For a real coding assistant, call an LLM API instead.
+## Style slider
 
-## How it works
+The slider in Settings tunes the temperature and the style instructions sent to the model:
 
-`POST /generate` takes `{"prompt": "...", "strictness": 0-100}`. Your prompt seeds the model, which predicts one character at a time from the last 1 to 4 characters, backing off to shorter contexts when needed.
-
-### Strictness slider
-
-| Slider | Label | Behavior |
+| Slider | Style | Effect |
 |---|---|---|
-| 0 to 34 | Unrestricted | High temperature (up to 1.6). Varied, sometimes rambling output. |
-| 35 to 70 | Balanced | Medium temperature. Uses a random start if your prompt isn't in the sample. |
-| 71 to 100 | Max Strict | Low temperature (down to 0.2), only the 3 most likely next characters, and it stops with a note instead of guessing when output drifts from the sample or the prompt isn't found. |
+| 0 to 34 | Creative | Higher temperature, suggests alternatives and extras |
+| 35 to 70 | Balanced | Default |
+| 71 to 100 | Precise | Low temperature, does exactly what you asked, minimal extras |
+
+It does not change the model's built-in safety behavior.
+
+## Configuration (environment variables)
+
+| Variable | Required | Notes |
+|---|---|---|
+| `ACCESS_PASSWORD` | yes | Password the web UI asks for. Chat is disabled without it. |
+| `ANTHROPIC_API_KEY` | one of these | Uses Claude. Model via `CLAUDE_MODEL` (default `claude-sonnet-5-5`). |
+| `GEMINI_API_KEY` | one of these | Uses Gemini. Model via `GEMINI_MODEL` (default `gemini-flash-latest`). If both keys are set, Claude is used. |
+| `MAX_OUTPUT_TOKENS` | no | Default 4096. |
+| `RATE_LIMIT_PER_MIN` | no | Default 30 requests per IP per minute. |
+
+Never commit API keys. Set them in your host's dashboard.
 
 ## Run locally
 
 ```bash
 pip install -r requirements.txt
-python app.py          # http://localhost:5000
-python -m unittest -v  # run the tests
+export ACCESS_PASSWORD=choose-one
+export GEMINI_API_KEY=...        # or ANTHROPIC_API_KEY
+python app.py                    # http://localhost:5000
+python -m unittest -v            # tests (no API key needed)
 ```
 
 ## Deploy on Render
 
-`render.yaml` is included. In Render choose **New > Blueprint**, pick this repo, and deploy. Free-tier services sleep when idle, so the first visit after a while takes about 30 seconds.
+`render.yaml` is included. Create the service (or Blueprint), then open the service's **Environment** tab and add `ACCESS_PASSWORD` (Render can generate it) and one API key. Free-tier services sleep when idle, so the first visit after a while takes about 30 seconds.
