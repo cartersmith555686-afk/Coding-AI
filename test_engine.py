@@ -76,10 +76,21 @@ class MatchingTests(unittest.TestCase):
         engine.respond("fizzbuzz", 10**9)
         engine.respond("fizzbuzz", -5)
 
-    def test_help_lists_everything(self):
+    def test_help_lists_areas_and_help_topic_lists_titles(self):
         text = engine.respond("help", 50)["text"]
-        for tpl in engine.TEMPLATES:
-            self.assertIn(tpl["title"], text)
+        for category in engine.categories():
+            self.assertIn(category, text)
+        for category, titles in engine.categories().items():
+            topic = engine.respond(f"help {category}", 50)["text"]
+            for title in titles:
+                self.assertIn(title, topic, category)
+
+    def test_registered_phrases_route_correctly(self):
+        for prompt, tid, lang in engine.PHRASES:
+            r = engine.respond(prompt, 50)
+            self.assertEqual(r["template"], tid, prompt)
+            if lang:
+                self.assertEqual(r["language"], lang, prompt)
 
 
 class StrictnessTests(unittest.TestCase):

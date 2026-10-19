@@ -13,14 +13,66 @@ answers, and how much it includes:
   precise  (>70)  needs a strong match, uses the validated variant, lists its assumptions
 """
 import datetime
+import importlib
+import logging
 import re
 
-from templates_basic import TEMPLATES as _BASIC
-from templates_web import TEMPLATES as _WEB
-from templates_more import TEMPLATES as _MORE
+import templates_basic as _basic
+import templates_web as _web
+import templates_more as _more
 
-TEMPLATES = _BASIC + _WEB + _MORE
+log = logging.getLogger("codingai")
+
+# New template modules (see tplkit.py for the contract). A module that does not exist yet is skipped;
+# a module that exists but is broken fails loudly at import time.
+EXTRA_MODULES = [
+    "tpl_roblox", "tpl_discord", "tpl_python", "tpl_frontend", "tpl_backend", "tpl_devops",
+    "tpl_compiled", "tpl_scripting",
+]
+
+TEMPLATES = []
+PHRASES = []          # (prompt, template_id, language or None): sample prompts the matcher must route correctly
+RUNNABLE = set()      # template ids whose code the tests execute
+EXTRA_SLOTS = {}      # extra slot rules contributed by modules
+_EXTENDS = []
+
+
+def _load():
+    legacy = ((_basic, "Everyday code"), (_web, "Web, apps and bots"), (_more, "Tools and scripts"))
+    for mod, category in legacy:
+        for tpl in mod.TEMPLATES:
+            tpl.setdefault("category", category)
+            tpl.setdefault("quiet_lang", False)
+            TEMPLATES.append(tpl)
+    for name in EXTRA_MODULES:
+        try:
+            mod = importlib.import_module(name)
+        except ModuleNotFoundError as e:
+            if e.name == name:
+                continue
+            raise
+        category = getattr(mod, "CATEGORY", name)
+        for tpl in getattr(mod, "TEMPLATES", []):
+            tpl.setdefault("category", category)
+            tpl.setdefault("quiet_lang", False)
+            TEMPLATES.append(tpl)
+        _EXTENDS.append((name, getattr(mod, "EXTEND", {})))
+        RUNNABLE.update(getattr(mod, "RUNNABLE", set()))
+        PHRASES.extend(getattr(mod, "PHRASES", []))
+        for slot, rules in getattr(mod, "SLOTS", {}).items():
+            EXTRA_SLOTS.setdefault(slot, []).extend(rules)
+
+
+_load()
 BY_ID = {t["id"]: t for t in TEMPLATES}
+if len(BY_ID) != len(TEMPLATES):
+    raise RuntimeError("duplicate template ids")
+for _name, _ext in _EXTENDS:
+    for _tid, _langs in _ext.items():
+        if _tid not in BY_ID:
+            raise RuntimeError(f"{_name}: EXTEND refers to unknown template {_tid!r}")
+        for _lang, _entry in _langs.items():
+            BY_ID[_tid]["langs"].setdefault(_lang, _entry)
 
 MAX_PROMPT_CHARS = 2000
 SCORE_FOR_FULL_CONFIDENCE = 6.0
@@ -32,15 +84,27 @@ LANG_WORDS = {
     "javascript": "javascript", "js": "javascript", "node": "javascript",
     "nodejs": "javascript", "node.js": "javascript", "express": "javascript",
     "discord.js": "javascript", "discordjs": "javascript",
+    "typescript": "typescript", "ts": "typescript",
     "bash": "bash", "shell": "bash", "sh": "bash", "terminal": "bash",
     "html": "html", "webpage": "html", "website": "html", "css": "html",
     "sql": "sql", "mysql": "sql", "postgres": "sql", "postgresql": "sql", "sqlite": "sql",
     "docker": "dockerfile", "dockerfile": "dockerfile",
+    "lua": "lua", "luau": "lua", "roblox": "lua",
+    "c": "c", "cpp": "cpp", "c++": "cpp", "java": "java", "go": "go", "golang": "go",
+    "rust": "rust", "php": "php", "ruby": "ruby", "perl": "perl",
+    "yaml": "yaml", "yml": "yaml", "json": "json",
 }
-LANG_FENCE = {"python": "python", "javascript": "javascript", "bash": "bash", "html": "html", "sql": "sql",
-              "dockerfile": "dockerfile"}
-LANG_LABEL = {"python": "Python", "javascript": "JavaScript", "bash": "Bash", "html": "HTML/CSS/JS", "sql": "SQL",
-              "dockerfile": "Dockerfile"}
+# Words that are also ordinary English: they only count as a language after "in", "using", "with"...
+AMBIGUOUS_LANG_WORDS = {"c", "go", "ts", "json"}
+_LANG_LEADERS = {"in", "using", "with", "via", "as", "a", "an", "for", "the", "into", "to", "from", "of"}
+LANG_FENCE = {"python": "python", "javascript": "javascript", "typescript": "typescript", "bash": "bash",
+              "html": "html", "sql": "sql", "dockerfile": "dockerfile", "lua": "lua", "c": "c", "cpp": "cpp",
+              "java": "java", "go": "go", "rust": "rust", "php": "php", "ruby": "ruby", "perl": "perl",
+              "yaml": "yaml", "json": "json", "css": "css"}
+LANG_LABEL = {"python": "Python", "javascript": "JavaScript", "typescript": "TypeScript", "bash": "Bash",
+              "html": "HTML/CSS/JS", "sql": "SQL", "dockerfile": "Dockerfile", "lua": "Lua (Roblox)", "c": "C",
+              "cpp": "C++", "java": "Java", "go": "Go", "rust": "Rust", "php": "PHP", "ruby": "Ruby",
+              "perl": "Perl", "yaml": "YAML", "json": "JSON", "css": "CSS"}
 
 HELP_WORDS = {"help", "hello", "hi", "hey", "commands", "capabilities", "menu"}
 IDENT_STOPWORDS = {
@@ -125,24 +189,36 @@ def mode_for(strictness):
 # Step 2: language
 # --------------------------------------------------------------------------
 UNSUPPORTED_LANGS = {
-    "rust": "Rust", "go": "Go", "golang": "Go", "java": "Java", "c": "C", "cpp": "C++", "c++": "C++",
-    "c#": "C#", "csharp": "C#", "ruby": "Ruby", "php": "PHP", "swift": "Swift", "kotlin": "Kotlin",
-    "typescript": "TypeScript", "ts": "TypeScript", "perl": "Perl", "lua": "Lua", "r": "R",
+    "c#": "C#", "csharp": "C#", "swift": "Swift", "kotlin": "Kotlin", "r": "R", "dart": "Dart",
+    "scala": "Scala", "haskell": "Haskell", "elixir": "Elixir", "assembly": "Assembly", "vba": "VBA",
 }
+
+
+def detect_languages(prompt):
+    """Every supported language mentioned in the prompt, in order of appearance."""
+    words = _words(prompt)
+    found = []
+    for i, word in enumerate(words):
+        lang = LANG_WORDS.get(word)
+        if not lang:
+            continue
+        if word in AMBIGUOUS_LANG_WORDS and not (i > 0 and words[i - 1] in _LANG_LEADERS):
+            continue
+        if lang not in found:
+            found.append(lang)
+    return found
 
 
 def detect_language(prompt):
     """First supported language mentioned in the prompt, or None."""
-    for word in _words(prompt):
-        if word in LANG_WORDS:
-            return LANG_WORDS[word]
-    return None
+    found = detect_languages(prompt)
+    return found[0] if found else None
 
 
 def detect_unsupported(prompt):
     """Name of a language the user asked for that I have no templates for, or None."""
     words = _words(prompt)
-    if detect_language(prompt):
+    if detect_languages(prompt):
         return None
     for i, word in enumerate(words):
         if word in UNSUPPORTED_LANGS and (len(word) > 2 or (i > 0 and words[i - 1] in ("in", "using", "with"))):
@@ -190,8 +266,11 @@ def extract_slots(prompt, template_id):
     for m in re.finditer(r"(?<![\w.])(\d{1,6})(?![\w.])", text):
         if slots.get("PORT") == m.group(1):
             continue
-        slots["NUMBER"] = str(int(m.group(1)))
-        break
+        if "NUMBER" not in slots:
+            slots["NUMBER"] = str(int(m.group(1)))
+        else:
+            slots["NUMBER2"] = str(int(m.group(1)))
+            break
 
     m = re.search(r"https?://[^\s\"'<>\\`]+", text)
     if m:
@@ -237,6 +316,24 @@ def extract_slots(prompt, template_id):
     if name:
         slots["TABLE"] = name
 
+    m = re.search(r"\b(?:called|named)\s+[\"']?([A-Za-z][A-Za-z0-9_]{0,30})\b", text)
+    if m and m.group(1).lower() not in IDENT_STOPWORDS:
+        slots["NAME"] = m.group(1)
+
+    for slot, rules in EXTRA_SLOTS.items():
+        for regex, value in rules:
+            m = re.search(regex, text, re.I)
+            if not m:
+                continue
+            try:
+                got = value(m) if callable(value) else value
+            except (ValueError, IndexError):
+                got = None
+            got = _clean_text(str(got)) if got is not None else ""
+            if got:
+                slots[slot] = got
+                break
+
     ext = {"csv_to_json": "csv", "read_json_file": "json"}.get(template_id)
     if ext:
         m = re.search(r"([A-Za-z0-9_./-]+\." + ext + r")\b", text)
@@ -278,24 +375,60 @@ def _block(lang, code):
     return f"```{LANG_FENCE.get(lang, '')}\n{code.rstrip()}\n```"
 
 
-def catalog_text():
-    lines = [f"- {t['title']}" for t in TEMPLATES]
+def categories():
+    """{category: [titles]} in the order templates were loaded."""
+    out = {}
+    for t in TEMPLATES:
+        out.setdefault(t["category"], []).append(t["title"])
+    return out
+
+
+def catalog_text(topic=None):
+    cats = categories()
+    if topic:
+        words = {w for t in tokenize(topic) for w in stems(t)} - {"help", "me", "with", "on", "for", "the", "a", "all", "list", "show"}
+        picked = {}
+        for cat, titles in cats.items():
+            cat_words = {w for t in tokenize(cat) for w in stems(t)}
+            if words & cat_words:
+                picked[cat] = titles
+        if not picked:
+            for t in TEMPLATES:
+                text_words = {w for x in tokenize(t["title"]) for w in stems(x)} | set(t["keywords"])
+                if words & text_words:
+                    picked.setdefault(t["category"], []).append(t["title"])
+        if picked:
+            return "\n\n".join(f"**{c}**\n" + "\n".join(f"- {x}" for x in titles) for c, titles in picked.items())
+        topic = None
+    lines = []
+    for cat, titles in cats.items():
+        sample = ", ".join(titles[:3])
+        lines.append(f"- **{cat}** ({len(titles)}): {sample}...")
     return "\n".join(lines)
 
 
-def _help_text():
+def _help_text(topic=None):
+    if topic:
+        found = catalog_text(topic)
+        if found and not found.startswith("- **"):
+            return f"Here is what I can build for \"{topic}\":\n\n{found}\n\nDescribe one of these and I'll write it."
     return (
         "I'm a fully custom code generator: no outside AI, just templates and rules I was built with. "
         "Describe what you want, for example:\n\n"
-        "- \"python script that renames files to lowercase\"\n"
+        "- \"roblox script that sets my walkspeed to 50\"\n"
         "- \"discord bot in js with a /hello command\"\n"
         "- \"flask api on port 8080\"\n"
-        "- \"sql table called orders\"\n"
-        "- \"fizzbuzz up to 30 in javascript\"\n\n"
-        "Here is everything I can build right now:\n\n" + catalog_text() + "\n\n"
+        "- \"binary search in c\"\n"
+        "- \"sql table called orders\"\n\n"
+        f"I know {len(TEMPLATES)} things, in these areas:\n\n" + catalog_text() + "\n\n"
+        "Type `help roblox` (or any area or word) to list what is in it. "
         "Use the Style slider: Creative shows every language and related ideas, "
         "Precise only answers when it is confident and lists its assumptions."
     )
+
+
+def _log_unmatched(prompt):
+    log.warning("unmatched prompt: %s", re.sub(r"\s+", " ", prompt)[:200])
 
 
 def _no_match(prompt, ranked, strictness, below_threshold):
@@ -307,11 +440,17 @@ def _no_match(prompt, ranked, strictness, below_threshold):
             f"I'm not confident enough to answer that at this strictness level. Closest things I know: {names}.\n\n"
             "Add more detail, or lower the Style slider toward Creative to let me take a guess."
         )
+    _log_unmatched(prompt)
     return (
         "I don't know how to build that yet. I only know the templates I was given, "
         "and nothing in your description matched them.\n\n"
-        "Here is what I can build:\n\n" + catalog_text()
+        "Here are the areas I cover:\n\n" + catalog_text() + "\n\n"
+        "Type `help <area>` (for example `help roblox`) to see what is inside one, "
+        "or try rephrasing with the key words (what it does, plus the language)."
     )
+
+
+_HELP_RE = re.compile(r"^\s*(?:help|commands|menu|what can you (?:do|build|make)|what do you (?:know|support)|list)\b[\s:,-]*(.*)$", re.I)
 
 
 def respond(prompt, strictness=50, previous=None):
@@ -324,8 +463,12 @@ def respond(prompt, strictness=50, previous=None):
     if not prompt:
         return {"text": "Describe the code you want and I'll build it.", "template": None, "confidence": 0.0}
 
+    m = _HELP_RE.match(prompt)
+    if m and len(prompt) < 60:
+        return {"text": _help_text(m.group(1).strip() or None), "template": None, "confidence": 0.0}
+
     ranked = score_templates(prompt)
-    lang = detect_language(prompt)
+    wanted = detect_languages(prompt)
 
     # Follow-up like "now in javascript": reuse the previous request's topic.
     if previous and (not ranked or ranked[0][0] < 3):
@@ -334,13 +477,13 @@ def respond(prompt, strictness=50, previous=None):
             combined_ranked = score_templates(combined)
             if combined_ranked and score_templates(earlier):
                 ranked = combined_ranked
-                lang = lang or detect_language(earlier)
+                wanted = wanted or detect_languages(earlier)
                 prompt = combined
                 break
 
     tokens = tokenize(prompt)
     if not ranked:
-        if tokens & HELP_WORDS or len(tokens) <= 2 and not lang:
+        if tokens & HELP_WORDS or len(tokens) <= 2 and not wanted:
             return {"text": _help_text(), "template": None, "confidence": 0.0}
         return {"text": _no_match(prompt, ranked, strictness, False), "template": None, "confidence": 0.0}
 
@@ -355,13 +498,14 @@ def respond(prompt, strictness=50, previous=None):
     slots = extract_slots(prompt, tpl["id"])
     langs = tpl["langs"]
     default_lang = next(iter(langs))
-    chosen = lang if lang in langs else default_lang
+    lang = wanted[0] if wanted else None
+    chosen = next((w for w in wanted if w in langs), default_lang)
 
     parts = [f"**{tpl['title']}**"]
     if unsupported:
         parts[0] += (f"\n\nI don't have {unsupported} templates yet, so here it is in "
                      f"{LANG_LABEL[chosen]}.")
-    elif lang and lang not in langs and not tpl.get("quiet_lang"):
+    elif lang and chosen not in wanted and not tpl.get("quiet_lang"):
         parts[0] += (f"\n\nI don't have a {LANG_LABEL.get(lang, lang)} version of this yet, "
                      f"so here it is in {LANG_LABEL[default_lang]}.")
     if conf < 0.5:

@@ -9,14 +9,15 @@ import tempfile
 import unittest
 from html.parser import HTMLParser
 
+import codecheck
 import engine
 
-# Self-contained programs (no network, servers, bots or third-party packages): these are actually executed.
+# Self-contained programs (no network, servers, bots or third-party packages) are actually executed.
 RUNNABLE = {
     "fizzbuzz", "fibonacci", "is_prime", "palindrome", "reverse_string", "factorial", "password_generator",
     "word_count", "hello_world", "sort_list", "binary_search", "email_validation", "temperature_converter",
     "calculator", "retry_backoff", "debounce_throttle", "unit_tests",
-}
+} | engine.RUNNABLE
 
 # Awkward-but-valid slot values, to prove substitution never breaks the generated code.
 TRICKY_SLOTS = {
@@ -71,50 +72,15 @@ def run(cmd, cwd, timeout=30):
 
 
 class TemplateTests(unittest.TestCase):
+    skipped = set()
+
     def check_code(self, label, lang, code, execute):
-        with tempfile.TemporaryDirectory() as tmp:
-            if lang == "python":
-                ast.parse(code)
-                if execute:
-                    path = os.path.join(tmp, "t.py")
-                    write(path, code)
-                    r = run([sys.executable, path], tmp)
-                    self.assertEqual(r.returncode, 0, f"{label}\n{r.stderr}")
-            elif lang == "javascript":
-                path = os.path.join(tmp, "t.js")
-                write(path, code)
-                r = run(["node", "--check", path], tmp)
-                self.assertEqual(r.returncode, 0, f"{label}\n{r.stderr}")
-                if execute:
-                    r = run(["node", path], tmp)
-                    self.assertEqual(r.returncode, 0, f"{label}\n{r.stderr}")
-            elif lang == "bash":
-                path = os.path.join(tmp, "t.sh")
-                write(path, code)
-                r = run(["bash", "-n", path], tmp)
-                self.assertEqual(r.returncode, 0, f"{label}\n{r.stderr}")
-            elif lang == "sql":
-                conn = sqlite3.connect(":memory:")
-                try:
-                    conn.executescript(code)
-                finally:
-                    conn.close()
-            elif lang == "html":
-                parser = _Tags()
-                parser.feed(code)
-                self.assertEqual(parser.errors, [], label)
-                self.assertEqual(parser.stack, [], f"{label}: unclosed {parser.stack}")
-                self.assertIn("<!DOCTYPE html>", code)
-                for i, script in enumerate(parser.scripts):
-                    path = os.path.join(tmp, f"s{i}.js")
-                    write(path, script)
-                    r = run(["node", "--check", path], tmp)
-                    self.assertEqual(r.returncode, 0, f"{label} <script>\n{r.stderr}")
-            elif lang == "dockerfile":
-                first = next(line for line in code.splitlines() if line.strip() and not line.startswith("#"))
-                self.assertTrue(first.startswith("FROM "), label)
-            else:
-                self.fail(f"no checker for language {lang!r} ({label})")
+        try:
+            codecheck.check_code(lang, code, execute)
+        except codecheck.ToolMissing as e:
+            TemplateTests.skipped.add(f"{lang} ({e})")
+        except AssertionError as e:
+            self.fail(f"{label}\n{e}")
 
     def test_every_template_with_defaults(self):
         count = 0
@@ -124,6 +90,8 @@ class TemplateTests(unittest.TestCase):
             self.check_code(f"{tid}/{lang}/{kind}", lang, filled, tid in RUNNABLE)
             count += 1
         self.assertGreater(count, 60)
+        if TemplateTests.skipped:
+            print("\nnot checked (tool missing):", sorted(TemplateTests.skipped))
 
     def test_every_template_with_tricky_slot_values(self):
         for tid, lang, kind, code in variants():
