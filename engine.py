@@ -27,7 +27,7 @@ log = logging.getLogger("codingai")
 # a module that exists but is broken fails loudly at import time.
 EXTRA_MODULES = [
     "tpl_roblox", "tpl_discord", "tpl_python", "tpl_frontend", "tpl_backend", "tpl_devops",
-    "tpl_compiled", "tpl_scripting",
+    "tpl_compiled", "tpl_scripting", "tpl_langs", "tpl_css",
 ]
 
 TEMPLATES = []
@@ -86,25 +86,27 @@ LANG_WORDS = {
     "discord.js": "javascript", "discordjs": "javascript",
     "typescript": "typescript", "ts": "typescript",
     "bash": "bash", "shell": "bash", "sh": "bash", "terminal": "bash",
-    "html": "html", "webpage": "html", "website": "html", "css": "html",
+    "html": "html", "webpage": "html", "website": "html", "css": "css", "stylesheet": "css",
     "sql": "sql", "mysql": "sql", "postgres": "sql", "postgresql": "sql", "sqlite": "sql",
     "docker": "dockerfile", "dockerfile": "dockerfile",
     "lua": "lua", "luau": "lua", "roblox": "lua",
+    "c#": "csharp", "csharp": "csharp", "cs": "csharp", "dotnet": "csharp", ".net": "csharp", "unity": "csharp",
     "c": "c", "cpp": "cpp", "c++": "cpp", "java": "java", "go": "go", "golang": "go",
     "rust": "rust", "php": "php", "ruby": "ruby", "perl": "perl",
     "yaml": "yaml", "yml": "yaml", "json": "json",
 }
 # Words that are also ordinary English: they only count as a language after "in", "using", "with"...
-AMBIGUOUS_LANG_WORDS = {"c", "go", "ts", "json"}
+AMBIGUOUS_LANG_WORDS = {"c", "go", "ts", "json", "cs"}
+LANG_FALLBACK = {"css": "html"}  # a CSS request can be answered with an HTML page that includes CSS
 _LANG_LEADERS = {"in", "using", "with", "via", "as", "a", "an", "for", "the", "into", "to", "from", "of"}
 LANG_FENCE = {"python": "python", "javascript": "javascript", "typescript": "typescript", "bash": "bash",
               "html": "html", "sql": "sql", "dockerfile": "dockerfile", "lua": "lua", "c": "c", "cpp": "cpp",
               "java": "java", "go": "go", "rust": "rust", "php": "php", "ruby": "ruby", "perl": "perl",
-              "yaml": "yaml", "json": "json", "css": "css"}
+              "yaml": "yaml", "json": "json", "css": "css", "csharp": "csharp"}
 LANG_LABEL = {"python": "Python", "javascript": "JavaScript", "typescript": "TypeScript", "bash": "Bash",
               "html": "HTML/CSS/JS", "sql": "SQL", "dockerfile": "Dockerfile", "lua": "Lua (Roblox)", "c": "C",
               "cpp": "C++", "java": "Java", "go": "Go", "rust": "Rust", "php": "PHP", "ruby": "Ruby",
-              "perl": "Perl", "yaml": "YAML", "json": "JSON", "css": "CSS"}
+              "perl": "Perl", "yaml": "YAML", "json": "JSON", "css": "CSS", "csharp": "C#"}
 
 HELP_WORDS = {"help", "hello", "hi", "hey", "commands", "capabilities", "menu"}
 IDENT_STOPWORDS = {
@@ -189,7 +191,7 @@ def mode_for(strictness):
 # Step 2: language
 # --------------------------------------------------------------------------
 UNSUPPORTED_LANGS = {
-    "c#": "C#", "csharp": "C#", "swift": "Swift", "kotlin": "Kotlin", "r": "R", "dart": "Dart",
+    "swift": "Swift", "kotlin": "Kotlin", "r": "R", "dart": "Dart",
     "scala": "Scala", "haskell": "Haskell", "elixir": "Elixir", "assembly": "Assembly", "vba": "VBA",
 }
 
@@ -499,13 +501,14 @@ def respond(prompt, strictness=50, previous=None):
     langs = tpl["langs"]
     default_lang = next(iter(langs))
     lang = wanted[0] if wanted else None
-    chosen = next((w for w in wanted if w in langs), default_lang)
+    wanted_ext = wanted + [LANG_FALLBACK[w] for w in wanted if w in LANG_FALLBACK]
+    chosen = next((w for w in wanted_ext if w in langs), default_lang)
 
     parts = [f"**{tpl['title']}**"]
     if unsupported:
         parts[0] += (f"\n\nI don't have {unsupported} templates yet, so here it is in "
                      f"{LANG_LABEL[chosen]}.")
-    elif lang and chosen not in wanted and not tpl.get("quiet_lang"):
+    elif lang and chosen not in wanted_ext and not tpl.get("quiet_lang"):
         parts[0] += (f"\n\nI don't have a {LANG_LABEL.get(lang, lang)} version of this yet, "
                      f"so here it is in {LANG_LABEL[default_lang]}.")
     if conf < 0.5:

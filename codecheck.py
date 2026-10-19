@@ -6,6 +6,7 @@ machine lacks the toolchain for that language (the caller decides whether that i
 import ast
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -133,12 +134,12 @@ def check_code(lang, code, execute=False):
             tsc = _have("tsc")
             _write(p("t.ts"), code)
             _ok(_run([tsc, "--noEmit", "--strict", "--target", "es2022", "--lib", "es2022,dom",
-                      "--module", "esnext", "--moduleResolution", "bundler", "--skipLibCheck", "--types", "",
+                      "--module", "esnext", "--moduleResolution", "bundler", "--skipLibCheck",
                       p("t.ts")], tmp, 90), "tsc")
             if execute:
                 _write(p("t.mts"), code)
                 _ok(_run([tsc, "--target", "es2022", "--lib", "es2022,dom", "--module", "nodenext",
-                          "--skipLibCheck", "--types", "", "--outDir", p("out"), p("t.mts")], tmp, 90), "tsc build")
+                          "--skipLibCheck", "--outDir", p("out"), p("t.mts")], tmp, 90), "tsc build")
                 _ok(_run([_have("node"), p("out/t.mjs")], tmp, 30), "ts run (node)")
 
         elif lang == "bash":
@@ -241,6 +242,14 @@ def check_code(lang, code, execute=False):
             _ok(_run([ruby, "-c", p("t.rb")], tmp), "ruby -c")
             if execute:
                 _ok(_run([ruby, p("t.rb")], tmp, 30), "ruby run")
+
+        elif lang == "csharp":
+            # No C# compiler on this machine: only check that brackets and quotes balance.
+            stripped = re.sub(r'"(?:\\.|[^"\\])*"', '""', code)
+            for a, b in ("()", "{}", "[]"):
+                assert stripped.count(a) == stripped.count(b), f"csharp: unbalanced {a}{b}"
+            assert "static void Main" in code or "Console." in code, "csharp: no entry point"
+            raise ToolMissing("dotnet (only bracket-checked)")
 
         elif lang == "perl":
             perl = _have("perl")

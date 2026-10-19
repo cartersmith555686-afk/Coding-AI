@@ -11,7 +11,7 @@ A chat where you describe the code you want and get it back. It is **completely 
 3. **Details**: it pulls slots out of your prompt (port numbers, names, `/commands`, URLs, file names, dates, `#channels`).
 4. **Fill**: it fills the matching hand-written template and returns it.
 
-It only knows the tasks in its library (see `templates_*.py` and `tpl_*.py`; type `help` in the chat for the areas, `help roblox` for one area). Roblox/Lua code is only compile-checked, never run in Roblox Studio. Prompts it could not match are logged (first 200 chars) so you can see what to add next. It cannot invent code for tasks it has no template for, and it says so instead of guessing. To teach it something new, add a template.
+It only knows the tasks in its library (see `templates_*.py` and `tpl_*.py`; type `help` in the chat for the areas, `help roblox` for one area). C# code is only bracket-checked (no C# compiler here) and Roblox/Lua code is only compile-checked, never run in Roblox Studio. Prompts it could not match are logged (first 200 chars) so you can see what to add next. It cannot invent code for tasks it has no template for, and it says so instead of guessing. To teach it something new, add a template.
 
 ## Style slider
 
