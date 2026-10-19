@@ -33,7 +33,7 @@
   .badge.precise { background: rgba(81,207,98,.15); color: var(--green); }
   input[type=range] { width: 100%; accent-color: var(--accent); }
   .labels { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); }
-  .hint { font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
+  .hint { font-size: 0.78rem; color: var(--muted); margin-top: 8px; line-height: 1.45; }
 
   #chat { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 18px; }
   .msg { max-width: 100%; }
@@ -46,33 +46,27 @@
   .codehead { display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; background: #1a1a1a; font-size: 0.72rem; color: var(--muted); }
   .copy { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.75rem; padding: 4px; }
   .codeblock pre { margin: 0; padding: 10px 12px; overflow-x: auto; font: 0.82rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
-  .cursor::after { content: "▍"; color: var(--accent); animation: blink 1s steps(2) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chip { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 14px; padding: 7px 12px; font-size: 0.8rem; cursor: pointer; text-align: left; }
+  .chip:hover { border-color: var(--accent); }
 
   #empty { margin: auto; text-align: center; color: var(--muted); max-width: 520px; }
   #empty h2 { color: var(--text); margin: 0 0 6px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
-  .chip { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 14px; padding: 8px 12px; font-size: 0.82rem; cursor: pointer; text-align: left; }
+  #empty .chips { justify-content: center; margin-top: 14px; }
 
-  #banner { display: none; background: #3a2323; color: #ffb3b3; padding: 10px 16px; font-size: 0.85rem; }
   footer { padding: 10px 16px 14px; }
   .composer { display: flex; align-items: flex-end; gap: 10px; background: var(--input); border: 1px solid var(--border); border-radius: 22px; padding: 6px 8px 6px 16px; }
   #input { flex: 1; background: transparent; border: none; outline: none; resize: none; color: var(--text); font: inherit; font-size: 1rem; max-height: 160px; padding: 8px 0; }
   #send { background: var(--accent); color: #111; border: none; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; flex-shrink: 0; }
   #send:disabled { background: #333; color: #666; cursor: not-allowed; }
   .note { text-align: center; font-size: 0.7rem; color: #8c8575; margin-top: 8px; }
-
-  #login { position: fixed; inset: 0; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
-  #login .box { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
-  #login input { background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 12px; font-size: 1rem; }
-  #login button { background: var(--accent); color: #111; border: none; border-radius: 10px; padding: 12px; font-weight: 700; cursor: pointer; }
-  #loginErr { color: var(--red); font-size: 0.85rem; min-height: 1.2em; }
 </style>
 </head>
 <body>
 <div class="app">
   <header>
-    <div class="brand"><span><span class="sparkle">✦</span> Coding AI</span><small id="modelLabel">&nbsp;</small></div>
+    <div class="brand"><span><span class="sparkle">✦</span> Coding AI</span><small id="engineLabel">Custom engine, no outside AI</small></div>
     <div class="actions">
       <button class="pill" id="settingsBtn">⚙️ Settings</button>
       <button class="pill" id="newBtn">New chat</button>
@@ -83,19 +77,19 @@
     <div class="slider-head"><span>Style</span><span id="styleBadge" class="badge balanced">Balanced</span></div>
     <input type="range" id="strictness" min="0" max="100" value="50">
     <div class="labels"><span>Creative</span><span>Precise</span></div>
-    <div class="hint">Creative explores alternatives. Precise sticks to exactly what you asked, with minimal extras.</div>
+    <div class="hint" id="styleHint"></div>
   </section>
-
-  <div id="banner"></div>
 
   <main id="chat">
     <div id="empty">
       <h2>What should we build?</h2>
-      <div>Describe the code you want and I'll write it. You can paste code to fix or change, too.</div>
+      <div>Describe the code you want. I'm a custom-built generator: I know a library of common tasks and fill them in from your description. Type <b>help</b> to see everything I can build.</div>
       <div class="chips">
-        <button class="chip">Write a Python script that renames all files in a folder to lowercase</button>
-        <button class="chip">Make a Discord bot in Node.js with a /ping slash command</button>
-        <button class="chip">Create a responsive pricing table in HTML and CSS</button>
+        <button class="chip">Python script that renames files to lowercase</button>
+        <button class="chip">Discord bot in JavaScript with a /hello command</button>
+        <button class="chip">Flask API on port 8080</button>
+        <button class="chip">SQL table called orders</button>
+        <button class="chip">FizzBuzz up to 30</button>
       </div>
     </div>
   </main>
@@ -105,67 +99,62 @@
       <textarea id="input" rows="1" placeholder="Describe the code you want..."></textarea>
       <button id="send" title="Send">↑</button>
     </div>
-    <div class="note">AI can make mistakes. Review and test code before using it.</div>
+    <div class="note">Generated code comes from hand-written templates. Read it and test it before using it.</div>
   </footer>
-</div>
-
-<div id="login">
-  <form class="box" id="loginForm">
-    <h2 style="margin:0">Coding AI</h2>
-    <div style="color:var(--muted);font-size:.9rem">Enter the access password.</div>
-    <input type="password" id="pw" placeholder="Password" autocomplete="current-password">
-    <div id="loginErr"></div>
-    <button type="submit">Unlock</button>
-  </form>
 </div>
 
 <script>
 (function () {
   var $ = function (s) { return document.querySelector(s); };
   var chat = $('#chat'), input = $('#input'), sendBtn = $('#send');
-  var KEY_STORE = 'coding-ai-key', CHAT_STORE = 'coding-ai-chat', STRICT_STORE = 'coding-ai-strict';
+  var CHAT_STORE = 'coding-ai-chat-v2', STRICT_STORE = 'coding-ai-strict';
+  var LANG_NAMES = { python: 'Python', javascript: 'JavaScript', bash: 'Bash', html: 'HTML', sql: 'SQL', dockerfile: 'Dockerfile' };
 
-  var accessKey = lsGet(KEY_STORE) || '';
-  var history = [];          // {role, content}
-  var busy = false, controller = null;
+  var history = [];     // {role, content}
+  var busy = false;
 
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
-  /* ---------- settings slider ---------- */
-  var slider = $('#strictness'), badge = $('#styleBadge');
+  /* ---------- style slider ---------- */
+  var slider = $('#strictness'), badge = $('#styleBadge'), hint = $('#styleHint');
+  var HINTS = {
+    creative: 'Creative: answers even when the match is loose, shows the code in every language I have, and suggests related things to build.',
+    balanced: 'Balanced: needs a reasonable match and shows one language.',
+    precise: 'Precise: only answers when I am confident, uses the validated version of the code where one exists, and lists the assumptions I made.'
+  };
   slider.value = lsGet(STRICT_STORE) || '50';
-  function updateBadge() {
+  function updateStyle() {
     var v = Number(slider.value);
     var kind = v < 35 ? 'creative' : (v <= 70 ? 'balanced' : 'precise');
     badge.className = 'badge ' + kind;
     badge.textContent = kind.charAt(0).toUpperCase() + kind.slice(1);
+    hint.textContent = HINTS[kind];
     lsSet(STRICT_STORE, String(v));
   }
-  slider.addEventListener('input', updateBadge); updateBadge();
+  slider.addEventListener('input', updateStyle); updateStyle();
   $('#settingsBtn').onclick = function () { $('#settings').classList.toggle('open'); };
 
-  /* ---------- markdown-lite rendering (safe: text goes through escape or textContent) ---------- */
+  /* ---------- rendering (text only goes through escape or textContent) ---------- */
   function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function inline(s) {
     return esc(s)
       .replace(/`([^`\n]+)`/g, '<code class="inline">$1</code>')
-      .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+      .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+      .replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,]|$)/g, '$1<i>$2</i>');
   }
   function copyText(text, btn) {
     function done() { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done, fallback);
-    } else { fallback(); }
     function fallback() {
       var t = document.createElement('textarea'); t.value = text; document.body.appendChild(t);
       t.select(); try { document.execCommand('copy'); done(); } catch (e) {} t.remove();
     }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
   }
-  function render(el, text, streaming) {
+  function render(el, text) {
     el.textContent = '';
-    var parts = text.split('```');
-    parts.forEach(function (part, i) {
+    text.split('```').forEach(function (part, i) {
       if (i % 2 === 0) {
         if (!part) return;
         var span = document.createElement('span');
@@ -174,9 +163,7 @@
       } else {
         var nl = part.indexOf('\n');
         var lang = nl >= 0 ? part.slice(0, nl).trim() : part.trim();
-        var code = nl >= 0 ? part.slice(nl + 1) : '';
-        if (nl >= 0 && /\s/.test(lang)) { lang = ''; code = part; }
-        code = code.replace(/\n$/, '');
+        var code = (nl >= 0 ? part.slice(nl + 1) : '').replace(/\n$/, '');
         var box = document.createElement('div'); box.className = 'codeblock';
         var head = document.createElement('div'); head.className = 'codehead';
         var label = document.createElement('span'); label.textContent = lang || 'code';
@@ -188,135 +175,95 @@
         el.appendChild(box);
       }
     });
-    if (streaming) el.classList.add('cursor'); else el.classList.remove('cursor');
   }
 
   /* ---------- chat UI ---------- */
-  function hideEmpty() { var e = $('#empty'); if (e) e.remove(); }
-  function addMsg(role, text) {
-    hideEmpty();
+  function clearChips() { document.querySelectorAll('#chat .chips.reply').forEach(function (c) { c.remove(); }); }
+  function addMsg(role, text, isError) {
+    var e = $('#empty'); if (e) e.remove();
     var wrap = document.createElement('div'); wrap.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
-    var bubble = document.createElement('div'); bubble.className = 'bubble';
-    if (role === 'user') bubble.textContent = text; else render(bubble, text, false);
+    var bubble = document.createElement('div'); bubble.className = 'bubble' + (isError ? ' err' : '');
+    if (role === 'user' || isError) bubble.textContent = text; else render(bubble, text);
     wrap.appendChild(bubble); chat.appendChild(wrap);
     chat.scrollTop = chat.scrollHeight;
-    return bubble;
+    return wrap;
   }
-  function save() { lsSet(CHAT_STORE, JSON.stringify(history.slice(-60))); }
+  function addChips(wrap, items) {
+    if (!items.length) return;
+    var row = document.createElement('div'); row.className = 'chips reply';
+    items.forEach(function (it) {
+      var b = document.createElement('button'); b.className = 'chip'; b.textContent = it.label;
+      b.onclick = function () { send(it.message); };
+      row.appendChild(b);
+    });
+    wrap.appendChild(row);
+  }
+  function save() { lsSet(CHAT_STORE, JSON.stringify(history.slice(-40))); }
   function loadSaved() {
     try { history = JSON.parse(lsGet(CHAT_STORE) || '[]'); } catch (e) { history = []; }
     if (!Array.isArray(history)) history = [];
     history.forEach(function (m) { addMsg(m.role, m.content); });
   }
-  function setBusy(b) {
-    busy = b;
-    sendBtn.textContent = b ? '■' : '↑';
-    sendBtn.title = b ? 'Stop' : 'Send';
-    sendBtn.disabled = false;
+  function previousPrompts() {
+    return history.filter(function (m) { return m.role === 'user'; }).slice(-3).map(function (m) { return m.content; });
   }
-  function showBanner(text) { var b = $('#banner'); b.textContent = text; b.style.display = text ? 'block' : 'none'; }
 
   input.addEventListener('input', function () {
     input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 160) + 'px';
   });
   input.addEventListener('keydown', function (e) {
-    var mobile = /Mobi|Android/i.test(navigator.userAgent);
-    if (e.key === 'Enter' && !e.shiftKey && !mobile) { e.preventDefault(); onSend(); }
+    if (e.key === 'Enter' && !e.shiftKey && !/Mobi|Android/i.test(navigator.userAgent)) { e.preventDefault(); send(); }
   });
-  sendBtn.onclick = onSend;
-  document.querySelectorAll('.chip').forEach(function (c) {
-    c.onclick = function () { input.value = c.textContent; onSend(); };
-  });
+  sendBtn.onclick = function () { send(); };
+  document.querySelectorAll('#empty .chip').forEach(function (c) { c.onclick = function () { send(c.textContent); }; });
   $('#newBtn').onclick = function () {
-    if (busy && controller) controller.abort();
     history = []; save(); chat.textContent = '';
     var empty = document.createElement('div'); empty.id = 'empty';
-    empty.innerHTML = '<h2>What should we build?</h2><div>Describe the code you want and I\'ll write it.</div>';
-    chat.appendChild(empty); showBanner('');
+    empty.innerHTML = '<h2>What should we build?</h2><div>Describe the code you want. Type <b>help</b> to see everything I can build.</div>';
+    chat.appendChild(empty);
   };
 
-  async function onSend() {
-    if (busy) { if (controller) controller.abort(); return; }
-    var text = input.value.trim();
+  async function send(forced) {
+    if (busy) return;
+    var text = (forced != null ? forced : input.value).trim();
     if (!text) return;
-    input.value = ''; input.style.height = 'auto';
+    if (forced == null) { input.value = ''; input.style.height = 'auto'; }
+    clearChips();
+    var prior = previousPrompts();
     history.push({ role: 'user', content: text });
     addMsg('user', text);
-    var bubble = addMsg('ai', '');
-    var full = '';
-    render(bubble, '', true);
-    setBusy(true);
-    controller = new AbortController();
+    busy = true; sendBtn.disabled = true;
     try {
       var res = await fetch('/api/chat', {
-        method: 'POST', signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', 'X-Access-Key': accessKey },
-        body: JSON.stringify({ messages: history.slice(-30), strictness: Number(slider.value) })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, strictness: Number(slider.value), previous: prior })
       });
-      if (!res.ok) {
-        var msg = 'Server error (' + res.status + ')';
-        try { msg = (await res.json()).message || msg; } catch (e) {}
-        if (res.status === 401) { showLogin(); }
-        throw new Error(msg);
+      var data = null;
+      try { data = await res.json(); } catch (e) {}
+      if (!res.ok || !data || data.status !== 'success') {
+        throw new Error((data && data.message) || ('Server error (' + res.status + ')'));
       }
-      var reader = res.body.getReader(), dec = new TextDecoder(), pending = false;
-      while (true) {
-        var r = await reader.read();
-        if (r.done) break;
-        full += dec.decode(r.value, { stream: true });
-        if (!pending) {
-          pending = true;
-          requestAnimationFrame(function () {
-            pending = false; render(bubble, full, true); chat.scrollTop = chat.scrollHeight;
-          });
-        }
-      }
-      full += dec.decode();
-      render(bubble, full, false);
-      if (/\n\n\[Error: [^\]]*\]\s*$/.test(full) || !full.trim()) {
-        // Provider failed: show it, but keep it out of the conversation history.
-        history.pop();
-        if (!full.trim()) render(bubble, '(No response)', false);
-      } else { history.push({ role: 'assistant', content: full }); }
+      history.push({ role: 'assistant', content: data.reply });
+      var wrap = addMsg('ai', data.reply);
+      var others = (data.languages || []).filter(function (l) { return l !== data.language; });
+      addChips(wrap, others.map(function (l) {
+        return { label: 'Show it in ' + (LANG_NAMES[l] || l), message: 'now in ' + l };
+      }));
     } catch (err) {
-      if (err.name === 'AbortError') {
-        render(bubble, full || '(Stopped)', false);
-        if (full.trim()) history.push({ role: 'assistant', content: full }); else history.pop();
-      } else {
-        history.pop();
-        bubble.classList.add('err'); render(bubble, err.message, false);
-      }
+      history.pop();
+      addMsg('ai', err.message, true);
     } finally {
-      setBusy(false); controller = null; save();
+      busy = false; sendBtn.disabled = false; save();
       chat.scrollTop = chat.scrollHeight;
     }
   }
 
-  /* ---------- login / status ---------- */
-  function showLogin(msg) {
-    $('#login').style.display = 'flex'; $('#loginErr').textContent = msg || '';
-    setTimeout(function () { $('#pw').focus(); }, 50);
-  }
-  async function checkStatus() {
-    try {
-      var res = await fetch('/api/status', { headers: { 'X-Access-Key': accessKey } });
-      var data = await res.json().catch(function () { return {}; });
-      if (res.status === 401) { showLogin(accessKey ? 'Wrong password.' : ''); return false; }
-      if (!res.ok) { showBanner(data.message || 'Server error.'); return false; }
-      $('#login').style.display = 'none';
-      if (!data.provider) { showBanner('No API key is set on the server yet. Add ANTHROPIC_API_KEY or GEMINI_API_KEY.'); }
-      else { showBanner(''); $('#modelLabel').textContent = (data.provider === 'anthropic' ? 'Claude' : 'Gemini') + ' · ' + data.model; }
-      return true;
-    } catch (e) { showBanner('Cannot reach the server.'); return false; }
-  }
-  $('#loginForm').addEventListener('submit', async function (e) {
-    e.preventDefault();
-    accessKey = $('#pw').value; $('#pw').value = '';
-    if (await checkStatus()) lsSet(KEY_STORE, accessKey);
-  });
+  fetch('/api/status').then(function (r) { return r.json(); }).then(function (d) {
+    if (d && d.templates) $('#engineLabel').textContent = 'Custom engine · ' + d.templates + ' templates · no outside AI';
+  }).catch(function () {});
 
   loadSaved();
-  checkStatus();
 })();
 </script>
 </body>
