@@ -511,7 +511,7 @@ def respond(prompt, strictness=50, previous=None):
     if conf < 0.5:
         parts.append("_This is a low-confidence guess. Check that it matches what you meant._")
 
-    shown = list(langs) if mode == "creative" else [chosen]
+    shown = ([chosen] + [l for l in langs if l != chosen])[:3] if mode == "creative" else [chosen]
     all_used = {}
     for language in shown:
         base, precise, run = langs[language]

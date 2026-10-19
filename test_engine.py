@@ -103,7 +103,7 @@ class StrictnessTests(unittest.TestCase):
 
     def test_creative_shows_every_language_balanced_shows_one(self):
         creative = engine.respond("fizzbuzz", 10)["text"]
-        self.assertEqual(len(code_blocks(creative)), 2)
+        self.assertEqual(len(code_blocks(creative)), 3)
         self.assertIn("Related", engine.respond("sort a list", 10)["text"])
         balanced = engine.respond("fizzbuzz", 50)["text"]
         self.assertEqual(len(code_blocks(balanced)), 1)
@@ -173,8 +173,8 @@ class FollowUpTests(unittest.TestCase):
         r = engine.respond("fizzbuzz in sql", 50)
         self.assertEqual(r["template"], "fizzbuzz")
         self.assertIn("don't have", r["text"])
-        r = engine.respond("fizzbuzz in rust", 50)
-        self.assertIn("Rust", r["text"])
+        r = engine.respond("fizzbuzz in swift", 50)
+        self.assertIn("Swift", r["text"])
 
 
 if __name__ == "__main__":

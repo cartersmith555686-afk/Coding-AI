@@ -108,7 +108,7 @@
   var $ = function (s) { return document.querySelector(s); };
   var chat = $('#chat'), input = $('#input'), sendBtn = $('#send');
   var CHAT_STORE = 'coding-ai-chat-v2', STRICT_STORE = 'coding-ai-strict';
-  var LANG_NAMES = { python: 'Python', javascript: 'JavaScript', bash: 'Bash', html: 'HTML', sql: 'SQL', dockerfile: 'Dockerfile' };
+  var LANG_NAMES = { python: 'Python', javascript: 'JavaScript', bash: 'Bash', html: 'HTML', sql: 'SQL', dockerfile: 'Dockerfile', lua: 'Lua', c: 'C', cpp: 'C++', java: 'Java', go: 'Go', rust: 'Rust', typescript: 'TypeScript', php: 'PHP', ruby: 'Ruby', perl: 'Perl' };
 
   var history = [];     // {role, content}
   var busy = false;

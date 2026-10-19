@@ -29,7 +29,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(data["template"], "fizzbuzz")
         self.assertIn("```python", data["reply"])
         self.assertEqual(data["language"], "python")
-        self.assertEqual(data["languages"], ["python", "javascript"])
+        self.assertEqual(data["languages"][:2], ["python", "javascript"])
 
     def test_works_without_any_api_key_or_password(self):
         for var in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "ACCESS_PASSWORD"):

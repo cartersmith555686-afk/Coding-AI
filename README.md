@@ -11,7 +11,7 @@ A chat where you describe the code you want and get it back. It is **completely 
 3. **Details**: it pulls slots out of your prompt (port numbers, names, `/commands`, URLs, file names, dates, `#channels`).
 4. **Fill**: it fills the matching hand-written template and returns it.
 
-It only knows the tasks in its library (about 35, see `templates_*.py`; type `help` in the chat to list them). It cannot invent code for tasks it has no template for, and it says so instead of guessing. To teach it something new, add a template.
+It only knows the tasks in its library (see `templates_*.py` and `tpl_*.py`; type `help` in the chat for the areas, `help roblox` for one area). Roblox/Lua code is only compile-checked, never run in Roblox Studio. Prompts it could not match are logged (first 200 chars) so you can see what to add next. It cannot invent code for tasks it has no template for, and it says so instead of guessing. To teach it something new, add a template.
 
 ## Style slider
 
@@ -25,7 +25,7 @@ The slider controls how sure the engine must be before it answers and how much i
 
 ## Adding a template
 
-Add an entry in `templates_more.py` (or a new file imported in `engine.py`):
+Add an entry to a module (see `tplkit.py` for the module format; new modules go in `EXTRA_MODULES` in `engine.py`; check one with `python check_module.py tpl_roblox`):
 
 ```python
 add(
@@ -36,7 +36,7 @@ add(
 )
 ```
 
-Slots in the code look like `__NUMBER|10__` (value from the prompt, default 10). Available slots: `NUMBER`, `PORT`, `URL`, `REPLY`, `COMMAND`, `CHANNEL`, `ROUTE`, `TABLE`, `FILE`, `DATE`. Then run the tests: they syntax-check every template and actually execute the self-contained Python and Node ones.
+Slots in the code look like `__NUMBER|10__` (value from the prompt, default 10). Available slots: `NUMBER`, `NUMBER2`, `NAME`, `PORT`, `URL`, `REPLY`, `COMMAND`, `CHANNEL`, `ROUTE`, `TABLE`, `FILE`, `DATE`. Then run the tests: they syntax-check every template and actually execute the self-contained Python and Node ones.
 
 ## Safety
 
