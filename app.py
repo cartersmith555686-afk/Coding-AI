@@ -76,6 +76,12 @@ def clean_previous(raw):
 # --------------------------------------------------------------------------
 # Routes
 # --------------------------------------------------------------------------
+@app.after_request
+def no_cache(resp):
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @app.route("/")
 def home():
     return send_from_directory(BASE_DIR, "index.html")

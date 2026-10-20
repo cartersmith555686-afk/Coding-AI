@@ -233,8 +233,13 @@
     history.push({ role: 'user', content: text });
     addMsg('user', text);
     busy = true; sendBtn.disabled = true;
+    var pending = addMsg('ai', 'Thinking...');
+    var wake = setTimeout(function () {
+      pending.firstChild.textContent = 'Waking the server up (free hosting sleeps when idle, this can take up to a minute)...';
+    }, 4000);
     try {
       var res = await fetch('/api/chat', {
+        cache: 'no-store',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, strictness: Number(slider.value), previous: prior })
@@ -254,12 +259,14 @@
       history.pop();
       addMsg('ai', err.message, true);
     } finally {
+      clearTimeout(wake);
+      if (pending.parentNode) pending.remove();
       busy = false; sendBtn.disabled = false; save();
       chat.scrollTop = chat.scrollHeight;
     }
   }
 
-  fetch('/api/status').then(function (r) { return r.json(); }).then(function (d) {
+  fetch('/api/status', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
     if (d && d.templates) $('#engineLabel').textContent = 'Custom engine · ' + d.templates + ' templates · no outside AI';
   }).catch(function () {});
 
